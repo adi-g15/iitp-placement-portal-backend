@@ -70,7 +70,7 @@ module.exports = {
         // Instead of silently returning false, I am throwing an error, this may
         // cause some 500s initially, but will likely reduce silent eligibility
         // bugs in the long run
-        const { id, X_marks, XII_marks, cpi, registered_for, course, placed_status } = student;
+        const { id, X_marks, XII_marks, cpi, registered_for, course, placed_status, placed_status_updated, internship_status } = student;
         if (!id || !X_marks || !XII_marks || !cpi || !registered_for || !course ) {
             throw `Some mandatory parameters not passed, or are null: ${student, job}`;
         }
@@ -194,7 +194,7 @@ module.exports = {
             const existing_internship_selection = selected_applications
                 .find(appl => appl.job.category == "Internship");
 
-            if (existing_internship_selection) {
+            if (existing_internship_selection || (internship_status === true)) {
                 debug_reason("Student already selected in an Internship");
                 return false /* Already selected in an Internship */;
             }
@@ -202,8 +202,13 @@ module.exports = {
 
         if ( job.category == "FTE" ) {
             if ( job.classification == "none" ) {
-                debug_reason("Job is invalid: FTE job has classification none");
-                return false /* Job is invalid: FTE job has classification none */;
+                const existing_internship_selection = selected_applications
+                    .find(appl => (appl.job.category == "FTE" && appl.job.classication == "none"));
+
+                if (existing_internship_selection || (internship_status === true)) {
+                    debug_reason("Student already selected in an Internship");
+                    return false /* Already selected in an Internship */;
+                }
             }
 
             // Check the extra conditions, based on already selected applications
@@ -211,7 +216,25 @@ module.exports = {
 
             // Date at which student was first selected in A2 (if any)
             const first_A2_application = selected_applications.find(appl => appl.job.classification === "A2") || null;
-            const date_A2_selection = first_A2_application ? Date.parse(first_A2_application.createdAt) : null;
+
+            // When placed in A2 offcampus, we are using the
+            // "placed_status_updated" field also
+            // NOTE: When Date.parse fails, it returns NaN
+            let offcampus_A2_placed_date = (placed_status === "placed_a2") ? (Date.parse(placed_status_updated) || null) : null;
+
+            let oncampus_A2_placed_date = (first_A2_application) ? (Date.parse(first_A2_application.createdAt)): null;
+
+            let date_A2_selection = null;
+
+            // Taking the first out of both dates
+            if ( oncampus_A2_placed_date && offcampus_A2_placed_date && (offcampus_A2_placed_date < oncampus_A2_placed_date) ) {
+                date_A2_selection = offcampus_A2_placed_date;
+            } else {
+                // Since, either one or both are null, or
+                // oncampus_A2_placed_date is earlier, either way, it has higher
+                // precedence, but if null, use offcampus_A2_placed_date
+                date_A2_selection = oncampus_A2_placed_date || offcampus_A2_placed_date;
+            }
 
             // Number of applications to A1 jobs created by student, AFTER being selected in an A2 job
             // FUTURE: This calculation will get repeated for all jobs, see if it can be optimised

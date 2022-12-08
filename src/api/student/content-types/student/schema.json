@@ -206,6 +206,18 @@
     },
     "transcript_link": {
       "type": "string"
+    },
+    "internship_status": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
+    "placed_status_updated": {
+      "type": "datetime",
+      "unique": false
+    },
+    "cover_letter_link": {
+      "type": "string"
     }
   }
 }
